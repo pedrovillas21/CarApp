@@ -5,13 +5,15 @@ import { Button } from '../components/Button';
 import { IconArrowRight, IconCar, IconEye, IconEyeOff, IconLock, IconShield, IconUser } from '../components/Icons';
 import { LogoCompleta } from '../components/Logo';
 import { Notice } from '../components/Notice';
+import { getRememberedEmail, setRememberedEmail } from '../lib/rememberEmail';
 
 const inputClass =
   'h-[54px] w-full rounded-[14px] border-[1.5px] border-cinza bg-white pl-12 text-base text-azul outline-none transition-[border-color,box-shadow] focus:border-azul focus:shadow-[0_0_0_3px_rgb(50_208_176/0.35)]';
 
 export function LoginScreen({ notice }: { notice?: string }) {
   const { signIn } = useAuth();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(getRememberedEmail);
+  const [remember, setRemember] = useState(() => getRememberedEmail() !== '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,10 @@ export function LoginScreen({ notice }: { notice?: string }) {
     if (message) {
       setError(message);
       setBusy(false);
+      return;
     }
+    // Só guarda o e-mail depois de um login que deu certo.
+    setRememberedEmail(remember ? email : null);
   };
 
   return (
@@ -107,7 +112,17 @@ export function LoginScreen({ notice }: { notice?: string }) {
           </div>
         </div>
 
-        <Button type="submit" loading={busy} loadingLabel="Entrando…" className="mt-1.5">
+        <label className="-my-1 flex min-h-11 cursor-pointer items-center gap-3 self-start text-[15px] select-none">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+            className="size-5 shrink-0 cursor-pointer accent-azul"
+          />
+          Lembrar meu e-mail
+        </label>
+
+        <Button type="submit" loading={busy} loadingLabel="Entrando…">
           <span className="inline-flex items-center gap-2.5">
             Entrar <IconArrowRight />
           </span>
