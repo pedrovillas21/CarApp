@@ -5,6 +5,7 @@ export type FleetVehicle = {
   plate: string;
   model: string;
   currentKm: number;
+  imageUrl: string | null;
   inUse: boolean;
   driverName: string | null;
   tripStartedAt: string | null;
@@ -16,6 +17,7 @@ export type OpenTrip = {
   vehicleId: string;
   plate: string;
   model: string;
+  imageUrl: string | null;
   destination: string | null;
   kmStart: number;
   startedAt: string;
@@ -81,6 +83,7 @@ type FleetRow = {
   plate: string;
   model: string;
   current_km: number;
+  image_url: string | null;
   in_use: boolean;
   driver_name: string | null;
   trip_started_at: string | null;
@@ -92,6 +95,7 @@ type OpenTripRow = {
   vehicle_id: string;
   plate: string;
   model: string;
+  image_url: string | null;
   destination: string | null;
   km_start: number;
   started_at: string;
@@ -115,6 +119,7 @@ export async function fetchFleet(): Promise<FleetVehicle[]> {
     plate: r.plate,
     model: r.model,
     currentKm: r.current_km,
+    imageUrl: r.image_url ?? null,
     inUse: r.in_use,
     driverName: r.driver_name,
     tripStartedAt: r.trip_started_at,
@@ -132,6 +137,7 @@ export async function fetchOpenTrip(): Promise<OpenTrip | null> {
     vehicleId: row.vehicle_id,
     plate: row.plate,
     model: row.model,
+    imageUrl: row.image_url ?? null,
     destination: row.destination,
     kmStart: row.km_start,
     startedAt: row.started_at,
@@ -150,6 +156,7 @@ export async function startTrip(vehicle: FleetVehicle, destination: string): Pro
     vehicleId: row.vehicle_id,
     plate: vehicle.plate,
     model: vehicle.model,
+    imageUrl: vehicle.imageUrl,
     destination: row.destination,
     kmStart: row.km_start,
     startedAt: row.started_at,

@@ -177,6 +177,19 @@ Regras:
 - **KM:** o `current_km` é o que está no hodômetro hoje. Ele vira o KM inicial da primeira viagem e depois é atualizado sozinho a cada devolução.
 - **Depois de aplicada, não edite a migração.** Para corrigir, crie outra.
 
+### Foto do carro
+
+Na escolha do carro e no início aparece uma foto do modelo (estilo app de corrida), com a placa embaixo do nome. Sem foto, aparece só a placa.
+
+1. Coloque a imagem em `public/vehicles/` (fundo transparente, de preferência WebP com uns 320 px de largura). Exemplo: `public/vehicles/byd-king.webp`.
+2. Aponte o carro para ela numa migração:
+   ```sql
+   update public.vehicles set image_url = '/vehicles/byd-king.webp' where model = 'BYD King';
+   ```
+   Ou já no cadastro: `insert into public.vehicles (plate, model, current_km, image_url) values (...)`.
+
+A foto atual do BYD King veio do site oficial da BYD Brasil e é só ilustrativa.
+
 ### Cadastrar pelo painel (alternativa)
 
 Supabase › Table Editor › `vehicles` › Insert row: preencha `plate`, `model` e `current_km`. Funciona na hora, mas não fica no histórico de migrações.

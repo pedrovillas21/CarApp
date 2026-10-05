@@ -4,6 +4,7 @@ import { Button } from '../components/Button';
 import { IconAlert, IconCheck, IconClock, IconGauge, IconLock, IconPin } from '../components/Icons';
 import { Notice } from '../components/Notice';
 import { Plate } from '../components/Plate';
+import { VehicleThumb } from '../components/VehicleThumb';
 import { Sheet } from '../components/Sheet';
 import { TopBar } from '../components/TopBar';
 import { parseConflict, toAppError, type Conflict, type FleetVehicle } from '../lib/api';
@@ -73,10 +74,13 @@ export function StartTripScreen({ fleet, online, onBack, onConfirm, onConflict }
                     selected ? 'border-azul bg-verde/10' : 'border-cinza bg-white'
                   }`}
                 >
-                  <Plate plate={v.plate} />
+                  <VehicleThumb imageUrl={v.imageUrl} model={v.model} plate={v.plate} />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="text-base leading-snug font-bold">{v.model}</span>
-                    <span className="text-sm text-azul/80 tabular-nums">{formatKm(v.currentKm)} km</span>
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-azul/80 tabular-nums">
+                      {v.imageUrl && <Plate plate={v.plate} size="sm" />}
+                      {formatKm(v.currentKm)} km
+                    </span>
                   </span>
                   {selected ? (
                     <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-verde">
@@ -91,9 +95,14 @@ export function StartTripScreen({ fleet, online, onBack, onConfirm, onConflict }
           </div>
           {busyVehicles.map((v) => (
             <div key={v.id} aria-disabled="true" className="flex items-center gap-3.5 rounded-2xl border-2 border-dashed border-cinza px-3.5 py-3">
-              <Plate plate={v.plate} muted />
+              <VehicleThumb imageUrl={v.imageUrl} model={v.model} plate={v.plate} muted />
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-base leading-snug font-bold">{v.model}</span>
+                {v.imageUrl && (
+                  <span className="self-start">
+                    <Plate plate={v.plate} size="sm" muted />
+                  </span>
+                )}
                 <span className="text-sm text-azul/80">
                   Com {v.isMine ? 'você' : firstName(v.driverName ?? '—')}
                   {v.tripStartedAt ? ` desde ${formatTime(v.tripStartedAt)}` : ''}
