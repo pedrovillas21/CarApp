@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+/* Paleta oficial do manual CREFITO 11 (.clauderules.md). Nenhuma outra cor entra no app. */
+@theme {
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-azul: #2e2f71;
+  --color-verde: #32d0b0;
+  --color-coral: #fe5b59;
+  --color-laranja: #feab68;
+  --color-azul-claro: #83c8cd;
+  --color-cinza: #e1dfe1;
+
+  --font-sans: "Ubuntu Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --animate-pulse-ring: pulse-ring 2.4s ease-out infinite;
+  --animate-caret: caret 1s steps(1) infinite;
+  --animate-skeleton: skeleton 1.2s ease-in-out infinite;
+  --animate-blink: skeleton 1.6s ease-in-out infinite;
+
+  @keyframes pulse-ring {
+    0% { transform: scale(1); opacity: 0.7; }
+    100% { transform: scale(1.14); opacity: 0; }
+  }
+  @keyframes caret {
+    50% { opacity: 0; }
+  }
+  @keyframes skeleton {
+    50% { opacity: 0.45; }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-white font-sans text-azul antialiased md:bg-cinza/50;
+  }
+  input::placeholder {
+    color: color-mix(in srgb, var(--color-azul) 60%, transparent);
+  }
+  :focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--color-verde) 75%, transparent);
+    outline-offset: 2px;
+  }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

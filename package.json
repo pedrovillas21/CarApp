@@ -1,0 +1,38 @@
+{
+  "name": "controle-frota-crefito11",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "vercel-build": "node scripts/migrate.mjs migrate --on-deploy && npm run build",
+    "db:migrate": "node scripts/migrate.mjs migrate",
+    "db:info": "node scripts/migrate.mjs info",
+    "db:validate": "node scripts/migrate.mjs validate",
+    "db:repair": "node scripts/migrate.mjs repair",
+    "db:new": "node scripts/migrate.mjs new",
+    "user:create": "node scripts/create-user.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "motion": "^14.0.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "postgres": "^3.4.9",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2"
+  }
+}

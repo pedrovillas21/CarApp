@@ -1,0 +1,11 @@
+node_modules
+dist
+.vercel
+
+# Segredos: nunca versionar
+.env
+.env.local
+.env.*.local
+
+*.log
+.DS_Store
