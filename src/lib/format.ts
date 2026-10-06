@@ -1,4 +1,18 @@
-export const formatKm = (km: number) => km.toLocaleString('pt-BR');
+import type { Refuel } from './api';
+
+export const formatKm =(km: number) => km.toLocaleString('pt-BR');
+
+export const formatMoney = (value: number) =>
+  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+/** Resumo do abastecimento: "Gasolina · R$ 150,00", "Gasolina R$ 150,00 + Eletricidade R$ 40,00". */
+export function describeRefuel(refuel: Refuel | null) {
+  if (!refuel) return 'Não abasteceu';
+  const gas = `Gasolina ${formatMoney(refuel.gasolineAmount ?? 0)}`;
+  const ele = `Eletricidade ${formatMoney(refuel.electricAmount ?? 0)}`;
+  if (refuel.fuelType === 'ambos') return `${gas} + ${ele}`;
+  return refuel.fuelType === 'gasolina' ? gas : ele;
+}
 
 export const formatTime = (value: string | number | Date) =>
   new Date(value).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });

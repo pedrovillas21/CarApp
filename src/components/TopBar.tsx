@@ -13,10 +13,10 @@ export function TopBar({ title, onBack, right }: { title: string; onBack: () => 
   );
 }
 
-export function Steps({ current }: { current: 1 | 2 }) {
-  const steps = ['KM final', 'Assinatura'];
+export function Steps({ current }: { current: 1 | 2 | 3 }) {
+  const steps = ['KM final', 'Abastecimento', 'Assinatura'];
   return (
-    <ol className="grid grid-cols-2 gap-2 px-5 pt-1.5" aria-label={`Etapa ${current} de 2`}>
+    <ol className="grid grid-cols-3 gap-2 px-5 pt-1.5" aria-label={`Etapa ${current} de ${steps.length}`}>
       {steps.map((label, index) => {
         const step = index + 1;
         const done = step <= current;

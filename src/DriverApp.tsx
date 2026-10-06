@@ -12,20 +12,23 @@ import {
   type FinishedTrip,
   type FleetVehicle,
   type OpenTrip,
+  type Refuel,
+  type TripType,
 } from './lib/api';
 import { ActiveTripScreen } from './screens/ActiveTripScreen';
 import { DoneScreen } from './screens/DoneScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { KmScreen } from './screens/KmScreen';
+import { RefuelScreen } from './screens/RefuelScreen';
 import { SignatureScreen } from './screens/SignatureScreen';
 import { SplashScreen } from './screens/SplashScreen';
 import { StartTripScreen } from './screens/StartTripScreen';
 
-type Screen = 'home' | 'start' | 'trip' | 'km' | 'sign' | 'done';
-const TRIP_SCREENS: Screen[] = ['trip', 'km', 'sign'];
+type Screen = 'home' | 'start' | 'trip' | 'km' | 'fuel' | 'sign' | 'done';
+const TRIP_SCREENS: Screen[] = ['trip', 'km', 'fuel', 'sign'];
 
 /**
- * Fluxo do condutor logado: Início → Iniciar viagem → Em viagem → KM final → Assinatura → Concluído.
+ * Fluxo do condutor logado: Início → Iniciar viagem → Em viagem → KM final → Abastecimento → Assinatura → Concluído.
  * Cada tela vira uma entrada no histórico, então o botão "voltar" do celular funciona.
  */
 export function DriverApp({ driver }: { driver: Driver }) {
@@ -38,6 +41,7 @@ export function DriverApp({ driver }: { driver: Driver }) {
   const [tripError, setTripError] = useState<AppError | null>(null);
   const [screen, setScreen] = useState<Screen>('home');
   const [kmEnd, setKmEnd] = useState<number | null>(null);
+  const [refuel, setRefuel] = useState<Refuel | null | undefined>(undefined); // undefined = etapa ainda não preenchida
   const [finished, setFinished] = useState<FinishedTrip | null>(null);
 
   const openTripRef = useRef(openTrip);
@@ -99,9 +103,9 @@ export function DriverApp({ driver }: { driver: Driver }) {
   }, [online, openTrip, tripError, loadOpenTrip, go]);
 
   const handleStart = useCallback(
-    async (vehicle: FleetVehicle, destination: string) => {
+    async (vehicle: FleetVehicle, destination: string, tripType: TripType) => {
       try {
-        const trip = await startTrip(vehicle, destination);
+        const trip = await startTrip(vehicle, destination, tripType);
         setOpenTrip(trip);
         openTripRef.current = trip;
         go('trip', { replace: true });
@@ -125,22 +129,24 @@ export function DriverApp({ driver }: { driver: Driver }) {
   const handleSigned = useCallback(
     async (signature: Blob) => {
       const trip = openTripRef.current;
-      if (!trip || kmEnd === null) return;
-      const result = await finishTrip(driver.id, trip, kmEnd, signature);
+      if (!trip || kmEnd === null || refuel === undefined) return;
+      const result = await finishTrip(driver.id, trip, kmEnd, refuel, signature);
       setFinished(result);
       setOpenTrip(null);
       openTripRef.current = null;
       setKmEnd(null);
+      setRefuel(undefined);
       go('done', { replace: true });
       void reloadFleet();
     },
-    [driver.id, kmEnd, go, reloadFleet],
+    [driver.id, kmEnd, refuel, go, reloadFleet],
   );
 
   // Tela efetiva: protege contra estados inconsistentes (ex.: voltar depois de concluir).
   let effective: Screen = screen;
   if (TRIP_SCREENS.includes(screen) && !openTrip) effective = 'home';
-  if (screen === 'sign' && kmEnd === null) effective = openTrip ? 'km' : 'home';
+  if ((screen === 'fuel' || screen === 'sign') && kmEnd === null) effective = openTrip ? 'km' : 'home';
+  else if (screen === 'sign' && refuel === undefined) effective = openTrip ? 'fuel' : 'home';
   if (screen === 'done' && !finished) effective = 'home';
   if ((screen === 'home' || screen === 'start') && openTrip) effective = 'trip';
 
@@ -158,6 +164,7 @@ export function DriverApp({ driver }: { driver: Driver }) {
         online={online}
         onFinish={() => {
           setKmEnd(null);
+          setRefuel(undefined);
           go('km');
         }}
       />
@@ -170,13 +177,33 @@ export function DriverApp({ driver }: { driver: Driver }) {
         onBack={back}
         onContinue={(km) => {
           setKmEnd(km);
+          go('fuel');
+        }}
+      />
+    );
+  } else if (effective === 'fuel' && openTrip) {
+    content = (
+      <RefuelScreen
+        trip={openTrip}
+        initial={refuel}
+        onBack={back}
+        onContinue={(value) => {
+          setRefuel(value);
           go('sign');
         }}
       />
     );
-  } else if (effective === 'sign' && openTrip && kmEnd !== null) {
+  } else if (effective === 'sign' && openTrip && kmEnd !== null && refuel !== undefined) {
     content = (
-      <SignatureScreen trip={openTrip} kmEnd={kmEnd} driverName={driver.fullName} online={online} onBack={back} onConfirm={handleSigned} />
+      <SignatureScreen
+        trip={openTrip}
+        kmEnd={kmEnd}
+        refuel={refuel}
+        driverName={driver.fullName}
+        online={online}
+        onBack={back}
+        onConfirm={handleSigned}
+      />
     );
   } else if (effective === 'done' && finished) {
     content = <DoneScreen summary={finished} onHome={() => go('home', { replace: true })} />;

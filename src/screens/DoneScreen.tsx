@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { m } from 'motion/react';
 import { Button } from '../components/Button';
-import { IconClock, IconGauge, IconPen } from '../components/Icons';
+import { IconClock, IconFuel, IconGauge, IconPen } from '../components/Icons';
 import type { FinishedTrip } from '../lib/api';
-import { formatKm, formatTime } from '../lib/format';
+import { describeRefuel, formatKm, formatTime } from '../lib/format';
 
 export function DoneScreen({ summary, onHome }: { summary: FinishedTrip; onHome: () => void }) {
   return (
@@ -44,6 +44,11 @@ export function DoneScreen({ summary, onHome }: { summary: FinishedTrip; onHome:
           <Row icon={<IconGauge />} divider>
             KM atualizado para <strong className="tabular-nums">{formatKm(summary.kmEnd)}</strong>
           </Row>
+          {summary.refuel && (
+            <Row icon={<IconFuel />} divider>
+              {describeRefuel(summary.refuel)}
+            </Row>
+          )}
           <Row icon={<IconPen />} divider>
             Assinatura anexada
           </Row>

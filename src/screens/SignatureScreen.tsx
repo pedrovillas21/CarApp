@@ -5,12 +5,13 @@ import { Notice } from '../components/Notice';
 import { Plate } from '../components/Plate';
 import { SignaturePad, type SignaturePadHandle } from '../components/SignaturePad';
 import { Steps, TopBar } from '../components/TopBar';
-import { toAppError, type OpenTrip } from '../lib/api';
-import { formatKm } from '../lib/format';
+import { toAppError, type OpenTrip, type Refuel } from '../lib/api';
+import { describeRefuel, formatKm } from '../lib/format';
 
-export function SignatureScreen({ trip, kmEnd, driverName, online, onBack, onConfirm }: {
+export function SignatureScreen({ trip, kmEnd, refuel, driverName, online, onBack, onConfirm }: {
   trip: OpenTrip;
   kmEnd: number;
+  refuel: Refuel | null;
   driverName: string;
   online: boolean;
   onBack: () => void;
@@ -37,13 +38,14 @@ export function SignatureScreen({ trip, kmEnd, driverName, online, onBack, onCon
   return (
     <main className="flex min-h-dvh flex-col">
       <TopBar title="Assinatura" onBack={onBack} right={<Plate plate={trip.plate} size="sm" />} />
-      <Steps current={2} />
+      <Steps current={3} />
 
       <section className="flex flex-col gap-3.5 px-5 pt-[18px]">
         <dl className="flex flex-col rounded-2xl border border-cinza px-4 py-1">
           <span className="pt-3 pb-1 text-[13px] font-medium text-azul/80">Você confirma a devolução de:</span>
           <SummaryRow label="Veículo" value={`${trip.model} · ${trip.plate}`} />
           <SummaryRow label="Quilometragem" value={`${formatKm(trip.kmStart)} → ${formatKm(kmEnd)} km`} />
+          <SummaryRow label="Abastecimento" value={describeRefuel(refuel)} />
           <SummaryRow label="Condutor" value={driverName} last />
         </dl>
 
@@ -67,7 +69,9 @@ export function SignatureScreen({ trip, kmEnd, driverName, online, onBack, onCon
           </button>
         </div>
 
-        <p className="text-[13px] leading-[1.45] text-azul/80">Ao assinar, confirmo que devolvi o veículo com a quilometragem informada.</p>
+        <p className="text-[13px] leading-[1.45] text-azul/80">
+          Ao assinar, confirmo que devolvi o veículo com a quilometragem{refuel ? ' e o abastecimento informados' : ' informada'}.
+        </p>
         {error && <Notice tone="error">{error}</Notice>}
         {!online && !error && <Notice tone="warning">Sem conexão. Para concluir o retorno, conecte-se à internet.</Notice>}
       </section>

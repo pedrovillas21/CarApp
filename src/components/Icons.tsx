@@ -77,7 +77,22 @@ export const IconClock = (p: IconProps) => (
   </Svg>
 );
 
-export const IconFlag = (p: IconProps) => (
+export const IconFuel = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16" />
+    <path d="M3 21h13" />
+    <path d="M7 7h5v4H7z" />
+    <path d="M15 10h2a2 2 0 0 1 2 2v4.5a1.5 1.5 0 0 0 3 0V9l-3-3" />
+  </Svg>
+);
+
+export const IconBolt = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" />
+  </Svg>
+);
+
+export const IconFlag =(p: IconProps) => (
   <Svg {...p}>
     <path d="M5 21V4" />
     <path d="M5 4h12l-2.5 4L17 12H5" />

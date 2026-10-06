@@ -118,7 +118,7 @@ export function KmScreen({ trip, initialKm, onBack, onContinue }: {
       <footer className="px-5 pt-4 pb-[max(24px,env(safe-area-inset-bottom))]">
         <Button disabled={!valid} onClick={() => onContinue(km)}>
           <span className="inline-flex items-center gap-2.5">
-            Continuar para assinatura <IconArrowRight />
+            Continuar <IconArrowRight />
           </span>
         </Button>
       </footer>

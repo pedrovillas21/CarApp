@@ -12,6 +12,18 @@ export type FleetVehicle = {
   isMine: boolean;
 };
 
+/** Só para controle: a viagem de abastecimento exige o valor abastecido no retorno. */
+export type TripType = 'normal' | 'abastecimento';
+
+export type FuelType = 'gasolina' | 'eletricidade' | 'ambos';
+
+/** O que foi abastecido no retorno. Cada valor só existe para o combustível escolhido. */
+export type Refuel = {
+  fuelType: FuelType;
+  gasolineAmount: number | null;
+  electricAmount: number | null;
+};
+
 export type OpenTrip = {
   id: string;
   vehicleId: string;
@@ -21,6 +33,7 @@ export type OpenTrip = {
   destination: string | null;
   kmStart: number;
   startedAt: string;
+  tripType: TripType;
 };
 
 export type FinishedTrip = {
@@ -28,6 +41,7 @@ export type FinishedTrip = {
   model: string;
   kmEnd: number;
   endedAt: string;
+  refuel: Refuel | null;
 };
 
 export type Conflict = { driver: string | null; startedAt: string | null };
@@ -43,6 +57,10 @@ const MESSAGES = {
   KM_END_TOO_HIGH: 'O KM final está muito acima do inicial. Confira o hodômetro.',
   SIGNATURE_INVALID: 'Assinatura inválida. Assine de novo.',
   SIGNATURE_MISSING: 'A assinatura não foi enviada. Tente de novo.',
+  TRIP_TYPE_INVALID: 'Escolha o tipo de viagem.',
+  FUEL_REQUIRED: 'Viagem de abastecimento: informe o que abasteceu e o valor.',
+  FUEL_INVALID: 'Confira o combustível escolhido e os valores.',
+  FUEL_AMOUNT_INVALID: 'Confira o valor abastecido: precisa ser maior que zero e de até R$ 5.000,00.',
   OFFLINE: 'Sem conexão com a internet. Tente de novo quando a conexão voltar.',
   UNKNOWN: 'Algo deu errado. Tente de novo.',
 } as const;
@@ -99,6 +117,7 @@ type OpenTripRow = {
   destination: string | null;
   km_start: number;
   started_at: string;
+  trip_type: TripType;
 };
 
 type TripRow = {
@@ -109,6 +128,7 @@ type TripRow = {
   km_end: number | null;
   started_at: string;
   ended_at: string | null;
+  trip_type: TripType;
 };
 
 export async function fetchFleet(): Promise<FleetVehicle[]> {
@@ -141,13 +161,15 @@ export async function fetchOpenTrip(): Promise<OpenTrip | null> {
     destination: row.destination,
     kmStart: row.km_start,
     startedAt: row.started_at,
+    tripType: row.trip_type,
   };
 }
 
-export async function startTrip(vehicle: FleetVehicle, destination: string): Promise<OpenTrip> {
+export async function startTrip(vehicle: FleetVehicle, destination: string, tripType: TripType): Promise<OpenTrip> {
   const { data, error } = await supabase.rpc('start_trip', {
     p_vehicle_id: vehicle.id,
     p_destination: destination.trim() || null,
+    p_trip_type: tripType,
   });
   if (error) throw toAppError(error);
   const row = data as TripRow;
@@ -160,10 +182,17 @@ export async function startTrip(vehicle: FleetVehicle, destination: string): Pro
     destination: row.destination,
     kmStart: row.km_start,
     startedAt: row.started_at,
+    tripType: row.trip_type,
   };
 }
 
-export async function finishTrip(driverId: string, trip: OpenTrip, kmEnd: number, signature: Blob): Promise<FinishedTrip> {
+export async function finishTrip(
+  driverId: string,
+  trip: OpenTrip,
+  kmEnd: number,
+  refuel: Refuel | null,
+  signature: Blob,
+): Promise<FinishedTrip> {
   const path = `${driverId}/${trip.id}.png`;
   try {
     const upload = await supabase.storage
@@ -175,17 +204,20 @@ export async function finishTrip(driverId: string, trip: OpenTrip, kmEnd: number
       p_trip_id: trip.id,
       p_km_end: kmEnd,
       p_signature_path: path,
+      p_fuel_type: refuel?.fuelType ?? null,
+      p_fuel_gasoline_amount: refuel?.gasolineAmount ?? null,
+      p_fuel_electric_amount: refuel?.electricAmount ?? null,
     });
     if (error) throw toAppError(error);
     const row = data as TripRow;
-    return { plate: trip.plate, model: trip.model, kmEnd: row.km_end ?? kmEnd, endedAt: row.ended_at ?? new Date().toISOString() };
+    return { plate: trip.plate, model: trip.model, kmEnd: row.km_end ?? kmEnd, endedAt: row.ended_at ?? new Date().toISOString(), refuel };
   } catch (err) {
     const appError = toAppError(err);
     // A resposta pode ter se perdido depois de gravar. Se a viagem já não está aberta, deu certo.
     if (appError.code !== 'OFFLINE') {
       const stillOpen = await fetchOpenTrip().catch(() => undefined);
       if (stillOpen === null) {
-        return { plate: trip.plate, model: trip.model, kmEnd, endedAt: new Date().toISOString() };
+        return { plate: trip.plate, model: trip.model, kmEnd, endedAt: new Date().toISOString(), refuel };
       }
     }
     throw appError;

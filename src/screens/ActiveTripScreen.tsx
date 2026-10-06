@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { m } from 'motion/react';
 import { Button } from '../components/Button';
-import { IconCar, IconFlag, IconGauge, IconPin } from '../components/Icons';
+import { IconCar, IconFlag, IconFuel, IconGauge, IconPin } from '../components/Icons';
 import { LogoTexto } from '../components/Logo';
 import { Plate } from '../components/Plate';
 import { useNow } from '../hooks/useNow';
@@ -53,6 +53,11 @@ export function ActiveTripScreen({ trip, online, onFinish }: { trip: OpenTrip; o
         <InfoRow icon={<IconGauge />} label="KM inicial" divider>
           <span className="font-bold tabular-nums">{formatKm(trip.kmStart)} km</span>
         </InfoRow>
+        {trip.tripType === 'abastecimento' && (
+          <InfoRow icon={<IconFuel />} label="Tipo" divider>
+            <span className="font-bold">Abastecimento</span>
+          </InfoRow>
+        )}
         {trip.destination && (
           <InfoRow icon={<IconPin />} label="Destino" divider>
             <span className="text-right font-bold">{trip.destination}</span>
@@ -65,7 +70,11 @@ export function ActiveTripScreen({ trip, online, onFinish }: { trip: OpenTrip; o
           Finalizar viagem
         </Button>
         <span className="text-center text-[13px] text-white/80">
-          {online ? 'Ao devolver o carro, informe o KM do painel e assine.' : 'Sem conexão agora. O cronômetro continua contando.'}
+          {!online
+            ? 'Sem conexão agora. O cronômetro continua contando.'
+            : trip.tripType === 'abastecimento'
+              ? 'Ao devolver o carro, informe o KM do painel, o valor abastecido e assine.'
+              : 'Ao devolver o carro, informe o KM do painel e assine.'}
         </span>
       </footer>
     </main>

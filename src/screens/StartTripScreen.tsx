@@ -1,21 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { m } from 'motion/react';
 import { Button } from '../components/Button';
-import { IconAlert, IconCheck, IconClock, IconGauge, IconLock, IconPin } from '../components/Icons';
+import { IconAlert, IconCar, IconCheck, IconClock, IconFuel, IconGauge, IconInfo, IconLock, IconPin } from '../components/Icons';
 import { Notice } from '../components/Notice';
 import { Plate } from '../components/Plate';
 import { VehicleDriver } from '../components/VehicleDriver';
 import { VehicleThumb } from '../components/VehicleThumb';
 import { Sheet } from '../components/Sheet';
 import { TopBar } from '../components/TopBar';
-import { parseConflict, toAppError, type Conflict, type FleetVehicle } from '../lib/api';
+import { parseConflict, toAppError, type Conflict, type FleetVehicle, type TripType } from '../lib/api';
 import { firstName, formatKm, formatTime } from '../lib/format';
 
 type Props = {
   fleet: FleetVehicle[];
   online: boolean;
   onBack: () => void;
-  onConfirm: (vehicle: FleetVehicle, destination: string) => Promise<void>;
+  onConfirm: (vehicle: FleetVehicle, destination: string, tripType: TripType) => Promise<void>;
   onConflict: () => void;
 };
 
@@ -23,6 +23,7 @@ export function StartTripScreen({ fleet, online, onBack, onConfirm, onConflict }
   const available = fleet.filter((v) => !v.inUse);
   const busyVehicles = fleet.filter((v) => v.inUse);
   const [pickedId, setPickedId] = useState<string | null>(available[0]?.id ?? null);
+  const [tripType, setTripType] = useState<TripType>('normal');
   const [destination, setDestination] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export function StartTripScreen({ fleet, online, onBack, onConfirm, onConflict }
     setBusy(true);
     setError(null);
     try {
-      await onConfirm(picked, destination);
+      await onConfirm(picked, destination, tripType);
     } catch (err) {
       const appError = toAppError(err);
       if (appError.code === 'VEHICLE_IN_USE') {
@@ -115,7 +116,43 @@ export function StartTripScreen({ fleet, online, onBack, onConfirm, onConflict }
 
         {picked && (
           <section className="flex flex-col gap-2.5">
-            <h2 className="text-base font-bold">2. Confira o KM inicial</h2>
+            <h2 id="tipo-label" className="text-base font-bold">
+              2. Tipo de viagem
+            </h2>
+            <div role="radiogroup" aria-labelledby="tipo-label" className="grid grid-cols-2 gap-2.5">
+              <TripTypeOption
+                selected={tripType === 'normal'}
+                onSelect={() => setTripType('normal')}
+                icon={<IconCar size={24} />}
+                iconBg="bg-azul-claro/35"
+                title="Viagem normal"
+                description="Serviço, entrega ou visita"
+              />
+              <TripTypeOption
+                selected={tripType === 'abastecimento'}
+                onSelect={() => setTripType('abastecimento')}
+                icon={<IconFuel size={24} />}
+                iconBg="bg-laranja/35"
+                title="Abastecimento"
+                description="Ir ao posto ou recarregar"
+              />
+            </div>
+            {tripType === 'abastecimento' ? (
+              <div className="flex items-start gap-2.5 rounded-[14px] bg-laranja/20 px-3.5 py-3 text-sm leading-[1.45]">
+                <IconInfo size={18} strokeWidth={2.2} className="mt-px shrink-0" />
+                <span>
+                  No retorno, você vai informar <strong>o que abasteceu e o valor</strong>. Guarde o comprovante.
+                </span>
+              </div>
+            ) : (
+              <p className="text-[13px] leading-[1.45] text-azul/80">Se abastecer no caminho, dá para informar o valor no retorno.</p>
+            )}
+          </section>
+        )}
+
+        {picked && (
+          <section className="flex flex-col gap-2.5">
+            <h2 className="text-base font-bold">3. Confira o KM inicial</h2>
             <div className="flex items-center gap-3.5 rounded-2xl bg-cinza/55 px-4 py-3.5">
               <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white">
                 <IconGauge size={22} />
@@ -135,7 +172,7 @@ export function StartTripScreen({ fleet, online, onBack, onConfirm, onConflict }
 
         <section className="flex flex-col gap-2.5">
           <label htmlFor="destino" className="text-base font-bold">
-            3. Destino ou motivo <span className="font-normal text-azul/80">(opcional)</span>
+            4. Destino ou motivo <span className="font-normal text-azul/80">(opcional)</span>
           </label>
           <div className="relative flex items-center">
             <IconPin className="pointer-events-none absolute left-4 text-azul/60" />
@@ -144,7 +181,7 @@ export function StartTripScreen({ fleet, online, onBack, onConfirm, onConflict }
               type="text"
               maxLength={200}
               enterKeyHint="done"
-              placeholder="Ex.: entrega de documentos"
+              placeholder={tripType === 'abastecimento' ? 'Ex.: posto ou eletroposto' : 'Ex.: entrega de documentos'}
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
               className="h-[54px] w-full rounded-[14px] border-[1.5px] border-cinza bg-white pr-4 pl-12 text-base outline-none transition-[border-color,box-shadow] focus:border-azul focus:shadow-[0_0_0_3px_rgb(50_208_176/0.35)]"
@@ -184,5 +221,38 @@ export function StartTripScreen({ fleet, online, onBack, onConfirm, onConflict }
         </Button>
       </Sheet>
     </main>
+  );
+}
+
+function TripTypeOption({ selected, onSelect, icon, iconBg, title, description }: {
+  selected: boolean;
+  onSelect: () => void;
+  icon: ReactNode;
+  iconBg: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <m.button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      whileTap={{ scale: 0.98 }}
+      className={`relative flex min-h-32 flex-col items-start gap-2.5 rounded-2xl border-2 p-3.5 text-left transition-colors ${
+        selected ? 'border-azul bg-verde/10' : 'border-cinza bg-white'
+      }`}
+    >
+      <span className={`flex size-11 items-center justify-center rounded-xl ${iconBg}`}>{icon}</span>
+      <span className="flex flex-col gap-0.5">
+        <span className="text-base font-bold">{title}</span>
+        <span className="text-[13px] leading-[1.35] text-azul/80">{description}</span>
+      </span>
+      {selected && (
+        <span className="absolute top-3 right-3 flex size-6 items-center justify-center rounded-full bg-verde">
+          <IconCheck size={14} strokeWidth={3} />
+        </span>
+      )}
+    </m.button>
   );
 }
