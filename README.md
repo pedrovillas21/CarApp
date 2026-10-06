@@ -305,6 +305,18 @@ O app do condutor não mostra histórico. Tudo fica pronto na tabela `public.tri
 
 Nomes dos condutores: tabela `public.drivers`. Dados dos carros: tabela `public.vehicles`.
 
+### Painel administrativo
+
+O painel (projeto `admCarApp`) lê esses dados e gera o relatório em PDF. Só quem está na tabela `public.admins` (e ativo) consegue ler as viagens de todos e as assinaturas; a regra está em `V4__painel_administrativo.sql`.
+
+```bash
+npm run admin:create -- --email fulano@crefito11.org --name "Fulano de Tal"
+npm run admin:create -- --email fulano@crefito11.org --reset-password
+npm run admin:create -- --email fulano@crefito11.org --disable   # tira o acesso ao painel
+```
+
+Se o e-mail já for de um condutor, ele só ganha o acesso ao painel e continua usando o app normalmente. `--disable` tira só o acesso ao painel.
+
 ---
 
 ## 10. Regras de segurança do banco
@@ -313,14 +325,14 @@ Nomes dos condutores: tabela `public.drivers`. Dados dos carros: tabela `public.
 - Um carro só tem uma viagem aberta por vez, e um condutor também. Se dois tentarem pegar o mesmo carro, o segundo recebe o aviso "Este carro acabou de sair".
 - O KM final não pode ser menor que o inicial, nem mais de 5.000 km acima (trava contra dígito a mais). Acima de 1.000 km o app só pede para conferir.
 - A viagem só fecha com a assinatura enviada para a pasta do próprio condutor. Depois de fechada, a assinatura não pode ser trocada.
-- Cada condutor só vê as próprias viagens.
+- Cada condutor só vê as próprias viagens. Administradores (tabela `admins`) leem todas, sem poder alterar.
 
 ---
 
 ## 11. Estrutura do código
 
 ```
-scripts/              migrate.mjs (migrações), create-user.mjs (condutores)
+scripts/              migrate.mjs (migrações), create-user.mjs (condutores), create-admin.mjs (painel)
 supabase/migrations/  SQL versionado
 src/auth/             login e sessão de 24 h
 src/lib/              cliente Supabase, chamadas ao banco, formatação

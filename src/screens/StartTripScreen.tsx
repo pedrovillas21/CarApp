@@ -4,6 +4,7 @@ import { Button } from '../components/Button';
 import { IconAlert, IconCheck, IconClock, IconGauge, IconLock, IconPin } from '../components/Icons';
 import { Notice } from '../components/Notice';
 import { Plate } from '../components/Plate';
+import { VehicleDriver } from '../components/VehicleDriver';
 import { VehicleThumb } from '../components/VehicleThumb';
 import { Sheet } from '../components/Sheet';
 import { TopBar } from '../components/TopBar';
@@ -94,21 +95,20 @@ export function StartTripScreen({ fleet, online, onBack, onConfirm, onConflict }
             })}
           </div>
           {busyVehicles.map((v) => (
-            <div key={v.id} aria-disabled="true" className="flex items-center gap-3.5 rounded-2xl border-2 border-dashed border-cinza px-3.5 py-3">
-              <VehicleThumb imageUrl={v.imageUrl} model={v.model} plate={v.plate} muted />
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-base leading-snug font-bold">{v.model}</span>
-                {v.imageUrl && (
-                  <span className="self-start">
-                    <Plate plate={v.plate} size="sm" muted />
-                  </span>
-                )}
-                <span className="text-sm text-azul/80">
-                  Com {v.isMine ? 'você' : firstName(v.driverName ?? '—')}
-                  {v.tripStartedAt ? ` desde ${formatTime(v.tripStartedAt)}` : ''}
-                </span>
+            <div key={v.id} aria-disabled="true" className="flex flex-col gap-3 rounded-2xl border-2 border-dashed border-cinza px-3.5 py-3">
+              <div className="flex items-center gap-3.5">
+                <VehicleThumb imageUrl={v.imageUrl} model={v.model} plate={v.plate} muted />
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-base leading-snug font-bold">{v.model}</span>
+                  {v.imageUrl && (
+                    <span className="self-start">
+                      <Plate plate={v.plate} size="sm" muted />
+                    </span>
+                  )}
+                </div>
+                <span className="rounded-full bg-laranja px-2.5 py-1.5 text-[13px] font-bold">Em uso</span>
               </div>
-              <span className="rounded-full bg-laranja px-2.5 py-1.5 text-[13px] font-bold">Em uso</span>
+              <VehicleDriver vehicle={v} />
             </div>
           ))}
         </section>

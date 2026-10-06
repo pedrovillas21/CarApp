@@ -17,7 +17,8 @@
     "db:validate": "node scripts/migrate.mjs validate",
     "db:repair": "node scripts/migrate.mjs repair",
     "db:new": "node scripts/migrate.mjs new",
-    "user:create": "node scripts/create-user.mjs"
+    "user:create": "node scripts/create-user.mjs",
+    "admin:create": "node scripts/create-admin.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

@@ -5,9 +5,10 @@ import { IconArrowRight, IconLogout, IconRefresh, IconWifiOff } from '../compone
 import { LogoTexto } from '../components/Logo';
 import { Notice } from '../components/Notice';
 import { Plate } from '../components/Plate';
+import { VehicleDriver } from '../components/VehicleDriver';
 import { VehicleThumb } from '../components/VehicleThumb';
 import type { AppError, FleetVehicle } from '../lib/api';
-import { firstName, formatKm, formatTime, initials, todayLabel } from '../lib/format';
+import { firstName, formatKm, initials, todayLabel } from '../lib/format';
 
 type Props = {
   driver: Driver;
@@ -119,26 +120,23 @@ export function HomeScreen({ driver, fleet, online, onStart, onSignOut }: Props)
         ) : (
           <ul className="flex flex-col gap-3">
             {vehicles.map((v) => (
-              <li key={v.id} className="flex items-center gap-3.5 rounded-2xl border border-cinza bg-white px-4 py-3.5">
-                <VehicleThumb imageUrl={v.imageUrl} model={v.model} plate={v.plate} />
-                <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                  <span className="text-base leading-snug font-bold">{v.model}</span>
-                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-azul/80 tabular-nums">
+              <li key={v.id} className="flex flex-col gap-3 rounded-2xl border border-cinza bg-white px-4 py-3.5">
+                <div className="flex items-center gap-3.5">
+                  <VehicleThumb imageUrl={v.imageUrl} model={v.model} plate={v.plate} muted={v.inUse} />
+                  <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+                    <span className="text-base leading-snug font-bold">{v.model}</span>
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-azul/80 tabular-nums">
                       {v.imageUrl && <Plate plate={v.plate} size="sm" />}
                       {formatKm(v.currentKm)} km
                     </span>
-                </div>
-                {v.inUse ? (
-                  <span className="flex flex-col items-end gap-1">
+                  </div>
+                  {v.inUse ? (
                     <span className="rounded-full bg-laranja px-2.5 py-1.5 text-[13px] font-bold">Em uso</span>
-                    <span className="text-xs text-azul/80">
-                      {v.isMine ? 'Você' : firstName(v.driverName ?? '—')}
-                      {v.tripStartedAt ? ` · ${formatTime(v.tripStartedAt)}` : ''}
-                    </span>
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-verde px-2.5 py-1.5 text-[13px] font-bold">Disponível</span>
-                )}
+                  ) : (
+                    <span className="rounded-full bg-verde px-2.5 py-1.5 text-[13px] font-bold">Disponível</span>
+                  )}
+                </div>
+                {v.inUse && <VehicleDriver vehicle={v} />}
               </li>
             ))}
           </ul>
