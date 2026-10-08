@@ -1,3 +1,4 @@
+import type { GeoFix } from './location';
 import { supabase } from './supabase';
 
 export type FleetVehicle = {
@@ -46,6 +47,12 @@ export type FinishedTrip = {
 
 export type Conflict = { driver: string | null; startedAt: string | null };
 
+/** saida: ao iniciar · parada: "Cheguei ao destino" · percurso: automático com o app aberto · retorno: ao finalizar */
+export type PointKind = 'saida' | 'parada' | 'percurso' | 'retorno';
+
+/** Ponto de GPS da viagem. O id é gerado no celular, para o reenvio não duplicar. */
+export type TripPoint = GeoFix & { id: string; kind: PointKind };
+
 const MESSAGES = {
   NOT_A_DRIVER: 'Seu usuário não tem acesso ao controle de frota. Fale com a administração.',
   VEHICLE_NOT_FOUND: 'Este carro não está mais disponível na frota.',
@@ -61,6 +68,8 @@ const MESSAGES = {
   FUEL_REQUIRED: 'Viagem de abastecimento: informe o que abasteceu e o valor.',
   FUEL_INVALID: 'Confira o combustível escolhido e os valores.',
   FUEL_AMOUNT_INVALID: 'Confira o valor abastecido: precisa ser maior que zero e de até R$ 5.000,00.',
+  TOO_MANY_POINTS: 'Limite de pontos de GPS desta viagem atingido.',
+  POINT_INVALID: 'Ponto de GPS inválido.',
   OFFLINE: 'Sem conexão com a internet. Tente de novo quando a conexão voltar.',
   UNKNOWN: 'Algo deu errado. Tente de novo.',
 } as const;
@@ -222,4 +231,41 @@ export async function finishTrip(
     }
     throw appError;
   }
+}
+
+/** Envia um lote da fila de pontos. Devolve quantos eram novos (reenvios contam zero). */
+export async function addTripPoints(tripId: string, points: TripPoint[]): Promise<number> {
+  const { data, error } = await supabase.rpc('add_trip_points', {
+    p_trip_id: tripId,
+    p_points: points.map((p) => ({
+      id: p.id,
+      kind: p.kind,
+      lat: p.lat,
+      lng: p.lng,
+      accuracy_m: p.accuracyM,
+      recorded_at: p.recordedAt,
+    })),
+  });
+  if (error) throw toAppError(error);
+  return (data as number | null) ?? 0;
+}
+
+/** O condutor já leu o aviso de registro de localização? */
+export async function fetchLocationConsent(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('get_my_location_consent');
+  if (error) throw toAppError(error);
+  return data !== null;
+}
+
+export async function acceptLocationTerms(): Promise<void> {
+  const { error } = await supabase.rpc('accept_location_terms');
+  if (error) throw toAppError(error);
+}
+
+/**
+ * Pede à Edge Function o cálculo da rota da viagem que acabou de fechar. Não espera nem falha:
+ * se não der certo, a viagem fica "pendente" e o painel pode recalcular.
+ */
+export function requestRouteCalc(tripId: string) {
+  supabase.functions.invoke('calcular-rota', { body: { tripId } }).catch(() => {});
 }

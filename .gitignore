@@ -9,3 +9,11 @@ dist
 
 *.log
 .DS_Store
+
+# VÌdeo renderizado da apresentaÁ„o
+video/
+
+# Ferramentas de grava√ß√£o do v√≠deo
+scripts/video/tmp/
+scripts/video/venv/
+scripts/video/quadros/

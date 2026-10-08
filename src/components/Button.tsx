@@ -1,12 +1,13 @@
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { m } from 'motion/react';
 
-type Variant = 'primary' | 'accent' | 'outline';
+type Variant = 'primary' | 'accent' | 'outline' | 'onDark';
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-azul text-white',
   accent: 'bg-verde text-azul',
   outline: 'border-[1.5px] border-azul bg-transparent text-azul',
+  onDark: 'border-[1.5px] border-white/70 bg-white/[0.06] text-white',
 };
 
 type ButtonProps = Omit<ComponentPropsWithoutRef<'button'>, 'onAnimationStart' | 'onDrag' | 'onDragStart' | 'onDragEnd'> & {
