@@ -2,9 +2,8 @@
 
 App web (mobile primeiro) para registrar a saída e o retorno dos carros do conselho.
 O condutor escolhe o carro (o KM inicial vem do banco), um cronômetro conta a viagem e, na devolução, ele informa o KM final e assina com o dedo.
-Durante a viagem, com o app aberto, o GPS do celular registra o trajeto. Ao finalizar, uma Edge Function estima o KM pelas ruas para o painel comparar com o KM informado (ver [seção 12](#12-localização-e-lgpd)).
 
-**Stack:** React 19 + Vite + Tailwind 4 + Motion, Supabase (Auth, Postgres, Storage, Edge Functions, pg_cron). Deploy na Vercel. Sem Next.js.
+**Stack:** React 19 + Vite + Tailwind 4 + Motion, Supabase (Auth, Postgres, Storage). Deploy único na Vercel. Sem Next.js.
 Identidade visual segue o manual em [.clauderules.md](.clauderules.md).
 
 Todos os comandos abaixo rodam no terminal, dentro da pasta do projeto.
@@ -24,7 +23,6 @@ Todos os comandos abaixo rodam no terminal, dentro da pasta do projeto.
 9. [Dados para o sistema administrativo](#9-dados-para-o-sistema-administrativo)
 10. [Regras de segurança do banco](#10-regras-de-segurança-do-banco)
 11. [Estrutura do código](#11-estrutura-do-código)
-12. [Localização e LGPD](#12-localização-e-lgpd)
 
 ---
 
@@ -93,6 +91,8 @@ Regras:
 - Comandos que não aceitam transação (como `create index concurrently`): coloque `-- migrate:no-transaction` nas primeiras linhas do arquivo.
 - Duas execuções ao mesmo tempo não se atropelam.
 - O histórico fica em `app_migrations.schema_history`, fora da API pública.
+
+**Migração V6 (rota das viagens):** está aplicada no banco, mas a funcionalidade de GPS/rotas foi pausada e o código dela está na branch `feature/mapa-de-rotas`. As tabelas e colunas da V6 (`trip_points`, `trips.route_*`, `drivers.location_consent_at`) ficam sem uso e não afetam o app. Não apague o arquivo da V6: o `db:migrate` (e o deploy na Vercel) acusa erro se uma migração aplicada não tiver arquivo.
 
 **Primeira vez:** rode `npm run db:migrate` para criar as tabelas, as regras de segurança e o local das assinaturas.
 
@@ -249,7 +249,7 @@ Apague esses arquivos em Storage › `signatures` (uma pasta por condutor, com o
 
 ### 4. Apagar o carro de teste e as viagens dele
 
-As viagens precisam sair antes do carro (o banco não deixa apagar um carro que tem viagens). Os pontos de GPS e a rota dessas viagens saem junto.
+As viagens precisam sair antes do carro (o banco não deixa apagar um carro que tem viagens):
 
 ```sql
 delete from public.trips
@@ -301,49 +301,6 @@ O login vale **24 h a partir da última vez que o app foi aberto**. Cada abertur
 
 Atenção: quem tem acesso ao projeto na Vercel consegue ver a `DATABASE_URL` se ela estiver cadastrada lá.
 
-### Rota das viagens (Edge Function `calcular-rota`)
-
-Ao finalizar a viagem, o app chama a Edge Function `calcular-rota`. Ela estima o KM pelas ruas a partir dos pontos de GPS e grava o resultado em `trips` (`route_status`, `route_km`, `route_geometry`). O cálculo usa o **OpenRouteService** (gratuito, sem cartão: 2.000 rotas por dia, uma por viagem).
-
-**Uma vez só:**
-
-1. Crie a conta em [openrouteservice.org/dev/#/signup](https://openrouteservice.org/dev/#/signup) e copie a chave (token) do plano **Standard** no Dashboard.
-2. Entre no Supabase pelo terminal (abre o navegador; o CLI roda por `npx`, sem instalar nada no projeto):
-
-   ```bash
-   npx supabase login
-   ```
-
-3. Guarde a chave do ORS como segredo da função (`<ref>` é o código do projeto, o `SEU-PROJETO` de `https://SEU-PROJETO.supabase.co`):
-
-   ```bash
-   npx supabase secrets set ORS_API_KEY=sua-chave --project-ref <ref>
-   ```
-
-**Publicar (e republicar depois de mudar `supabase/functions/`):**
-
-```bash
-npx supabase functions deploy calcular-rota --no-verify-jwt --project-ref <ref>
-```
-
-- `--no-verify-jwt`: a função confere sozinha quem chamou (pelo token do login) e aceita só o condutor da viagem ou um administrador. Isso funciona tanto com as chaves antigas quanto com as novas chaves de assinatura do Supabase.
-- A `ORS_API_KEY` fica só no Supabase. **Nunca** coloque no `.env.local` nem na Vercel.
-- A service role usada pela função já vem configurada pelo Supabase dentro da Edge Function.
-- **Ordem na primeira vez:** migração V6 (`npm run db:migrate`) → segredo e publicação da função → deploy do app e do painel.
-
-**Situações gravadas em `route_status`:**
-
-| Valor | Quando |
-|---|---|
-| `pendente` | viagem finalizada, cálculo ainda não feito (ou o app não conseguiu chamar a função) |
-| `ok` | rota calculada: `route_km` e o desenho em `route_geometry` |
-| `incompleta` | todos os pontos a menos de 300 m da saída (ex.: só saída e retorno na sede). Não gera aviso |
-| `sem_gps` | nenhum ponto (GPS negado ou viagem de antes desta funcionalidade, finalizada depois dela) |
-| `erro` | falha no serviço de rotas; a mensagem fica em `route_error` e o painel pode recalcular |
-| vazio | viagem de antes desta funcionalidade |
-
-**Trocar de fornecedor** (por exemplo, um OSRM próprio quando atender vários conselhos): nova implementação em `supabase/functions/_shared/rota.ts` e a variável `ROUTE_PROVIDER` (`npx supabase secrets set ROUTE_PROVIDER=...`).
-
 ---
 
 ## 9. Dados para o sistema administrativo
@@ -358,13 +315,8 @@ O app do condutor não mostra histórico. Tudo fica pronto na tabela `public.tri
 | `km_start`, `km_end`, `km_driven` | quilometragem (km rodados calculado pelo banco) |
 | `destination` | destino ou motivo |
 | `signature_path` | PNG da assinatura no bucket privado `signatures` |
-| `route_status`, `route_km` | situação da rota e KM estimado pelas ruas (ver [seção 8](#rota-das-viagens-edge-function-calcular-rota)) |
-| `route_geometry` | desenho da rota (GeoJSON), apagado após 12 meses |
-| `route_computed_at`, `route_error` | quando a rota foi calculada e, se falhou, o motivo |
 
-Pontos de GPS: tabela `public.trip_points` (`kind` = `saida`, `parada`, `percurso` ou `retorno`, `lat`, `lng`, `accuracy_m`, `recorded_at`). Só administradores leem.
-
-Nomes dos condutores: tabela `public.drivers` (`location_consent_at` = quando o condutor leu o aviso de localização). Dados dos carros: tabela `public.vehicles`.
+Nomes dos condutores: tabela `public.drivers`. Dados dos carros: tabela `public.vehicles`.
 
 ### Painel administrativo
 
@@ -387,9 +339,6 @@ Se o e-mail já for de um condutor, ele só ganha o acesso ao painel e continua 
 - O KM final não pode ser menor que o inicial, nem mais de 5.000 km acima (trava contra dígito a mais). Acima de 1.000 km o app só pede para conferir.
 - A viagem só fecha com a assinatura enviada para a pasta do próprio condutor. Depois de fechada, a assinatura não pode ser trocada.
 - Cada condutor só vê as próprias viagens. Administradores (tabela `admins`) leem todas, sem poder alterar.
-- Pontos de GPS entram só pela função `add_trip_points`: viagem do próprio condutor, ainda aberta, até 500 pontos por envio e 5.000 por viagem, coordenadas e horário válidos. Reenviar o mesmo ponto não duplica (o id é gerado no celular).
-- Os pontos só podem ser lidos por administradores. O condutor não lê nem os próprios pontos.
-- O resultado da rota (`route_*`) só é gravado pela Edge Function, com a service role. Ela aceita o condutor da viagem (uma vez, ao finalizar) ou um administrador (Recalcular).
 
 ---
 
@@ -398,70 +347,9 @@ Se o e-mail já for de um condutor, ele só ganha o acesso ao painel e continua 
 ```
 scripts/              migrate.mjs (migrações), create-user.mjs (condutores), create-admin.mjs (painel)
 supabase/migrations/  SQL versionado
-supabase/functions/   Edge Function calcular-rota (Deno) e _shared/ (escolha dos pontos, fornecedor de rotas)
 src/auth/             login e sessão de 24 h
-src/lib/              cliente Supabase, chamadas ao banco, formatação, GPS (location.ts) e fila de pontos (pointQueue.ts)
-src/hooks/            conexão, relógio e registro do percurso (useTripTracking.ts)
-src/screens/          uma tela por arquivo (Login, Início, Aviso de localização, Iniciar viagem, Em viagem, KM, Assinatura, Concluído)
+src/lib/              cliente Supabase, chamadas ao banco, formatação
+src/screens/          uma tela por arquivo (Login, Início, Iniciar viagem, Em viagem, KM, Assinatura, Concluído)
 src/components/       logo, placa, botões, painel inferior, assinatura
 public/brand/         logo negativa e redução "Crefito 11"
 ```
-
----
-
-## 12. Localização e LGPD
-
-O trajeto serve para **conferir a quilometragem informada** em cada viagem. Não é acompanhamento ao vivo: ninguém vê onde o carro está durante a viagem.
-
-### O que é coletado e quando
-
-| Ponto | Quando |
-|---|---|
-| Saída | ao tocar em "Iniciar viagem" |
-| Parada | cada vez que o condutor toca em **"Cheguei ao destino"** |
-| Percurso | automático, a cada 60 s ou 300 m, **só com a tela da viagem aberta e visível** |
-| Retorno | ao tocar em "Finalizar viagem" |
-
-Cada ponto tem latitude, longitude, precisão do GPS e horário.
-
-- O app é um site (PWA) e **o navegador não lê a localização em segundo plano**. Com o app fechado, com a tela bloqueada ou fora de uma viagem, nada é registrado.
-- Na primeira viagem o app mostra um aviso explicando o registro, e o condutor toca em **"Entendi"**. A data fica em `drivers.location_consent_at`. Sem esse aviso, o GPS não é lido.
-- **Permissão negada:** a viagem funciona normalmente. O app mostra "GPS desligado: a rota não será registrada" e o painel marca a viagem como "Sem GPS", sem aviso de divergência.
-- Sem internet, os pontos ficam guardados no celular e são enviados quando a conexão volta. Os que não chegarem antes de finalizar a viagem são descartados.
-
-### Quem vê
-
-- Só **administradores** (tabela `admins`), pelo painel `admCarApp`. O condutor não vê o histórico de pontos.
-- O cálculo da rota envia **só as coordenadas** (até 50 pontos por viagem, sem nome, placa ou horário) ao OpenRouteService (HeiGIT, Alemanha). O mapa do painel baixa as imagens do OpenFreeMap. Nenhum dos dois recebe dados do condutor.
-
-### Por quanto tempo
-
-- **12 meses.** Todo dia às 03:30 (Brasília), o agendamento `frota-limpar-pontos-antigos` (pg_cron) apaga os pontos e o desenho da rota das viagens com mais de 12 meses. O KM estimado continua, porque é só um número do relatório.
-- Conferir o agendamento: Supabase › Integrations › Cron, ou `select * from cron.job;` no SQL Editor.
-- Mudar o prazo (por exemplo, 6 meses) por migração:
-
-  ```sql
-  select cron.schedule('frota-limpar-pontos-antigos', '30 6 * * *', $job$select public.purge_old_trip_points(6)$job$);
-  ```
-
-### Pedido de exclusão de um condutor
-
-Para apagar os pontos e as rotas de um condutor (sem apagar as viagens, que são registro do uso do carro), rode no SQL Editor:
-
-```sql
-delete from public.trip_points
-where trip_id in (select id from public.trips where driver_id = 'ID-DO-CONDUTOR');
-
-update public.trips set route_geometry = null
-where driver_id = 'ID-DO-CONDUTOR';
-```
-
-### Créditos obrigatórios
-
-O painel mostra no mapa: "© openrouteservice.org by HeiGIT", "OpenFreeMap", "© OpenMapTiles" e "© OpenStreetMap contributors". O PDF traz o crédito das rotas na nota abaixo da tabela. Não remova esses créditos: são condição de uso gratuito dos serviços.
-
-### Para a gerência providenciar
-
-- **Norma ou portaria interna** informando os condutores sobre o registro de localização durante as viagens com carro do conselho: finalidade (conferência da quilometragem), quando ocorre, quem acessa e prazo de guarda. O aviso do app resume esse conteúdo, mas não substitui a norma.
-- Confirmar com o jurídico/encarregado de dados a **base legal** do tratamento e se o prazo de 12 meses atende.
-- **Antes de oferecer o sistema a outros conselhos:** confirmar os termos de uso comercial do OpenRouteService, ou instalar um servidor de rotas próprio (OSRM, GraphHopper ou Valhalla).

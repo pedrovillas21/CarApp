@@ -4,11 +4,8 @@ import { useAuth, type Driver } from './auth/AuthProvider';
 import { useFleet } from './hooks/useFleet';
 import { useOnline } from './hooks/useOnline';
 import {
-  acceptLocationTerms,
-  fetchLocationConsent,
   fetchOpenTrip,
   finishTrip,
-  requestRouteCalc,
   startTrip,
   toAppError,
   type AppError,
@@ -18,27 +15,20 @@ import {
   type Refuel,
   type TripType,
 } from './lib/api';
-import { getPosition } from './lib/location';
-import { clearPoints, enqueuePoint, flushPoints, pruneQueues, recordPoint } from './lib/pointQueue';
 import { ActiveTripScreen } from './screens/ActiveTripScreen';
 import { DoneScreen } from './screens/DoneScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { KmScreen } from './screens/KmScreen';
-import { LocationConsentScreen } from './screens/LocationConsentScreen';
 import { RefuelScreen } from './screens/RefuelScreen';
 import { SignatureScreen } from './screens/SignatureScreen';
 import { SplashScreen } from './screens/SplashScreen';
 import { StartTripScreen } from './screens/StartTripScreen';
 
-type Screen = 'home' | 'consent' | 'start' | 'trip' | 'km' | 'fuel' | 'sign' | 'done';
+type Screen = 'home' | 'start' | 'trip' | 'km' | 'fuel' | 'sign' | 'done';
 const TRIP_SCREENS: Screen[] = ['trip', 'km', 'fuel', 'sign'];
 
-/** Na assinatura, quanto esperar pelo GPS do ponto de retorno (costuma chegar enquanto o condutor digita o KM). */
-const RETURN_POINT_WAIT_MS = 5000;
-
 /**
- * Fluxo do condutor logado: Início → (Aviso de localização, só na primeira vez) → Iniciar viagem → Em viagem
- * → KM final → Abastecimento → Assinatura → Concluído.
+ * Fluxo do condutor logado: Início → Iniciar viagem → Em viagem → KM final → Abastecimento → Assinatura → Concluído.
  * Cada tela vira uma entrada no histórico, então o botão "voltar" do celular funciona.
  */
 export function DriverApp({ driver }: { driver: Driver }) {
@@ -53,11 +43,9 @@ export function DriverApp({ driver }: { driver: Driver }) {
   const [kmEnd, setKmEnd] = useState<number | null>(null);
   const [refuel, setRefuel] = useState<Refuel | null | undefined>(undefined); // undefined = etapa ainda não preenchida
   const [finished, setFinished] = useState<FinishedTrip | null>(null);
-  const [consent, setConsent] = useState<boolean | undefined>(undefined); // undefined = ainda não sabemos; o GPS só liga com true
 
   const openTripRef = useRef(openTrip);
   openTripRef.current = openTrip;
-  const returnPointRef = useRef<Promise<unknown> | null>(null);
 
   const go = useCallback((next: Screen, { replace = false } = {}) => {
     const entry = { screen: next };
@@ -91,7 +79,6 @@ export function DriverApp({ driver }: { driver: Driver }) {
       setTripError(null);
       setOpenTrip(trip);
       openTripRef.current = trip;
-      pruneQueues(trip?.id ?? null);
       return trip;
     } catch (err) {
       setTripError(toAppError(err));
@@ -115,46 +102,13 @@ export function DriverApp({ driver }: { driver: Driver }) {
     }
   }, [online, openTrip, tripError, loadOpenTrip, go]);
 
-  // Consentimento de localização: carrega ao abrir e de novo quando a conexão voltar.
-  useEffect(() => {
-    if (consent !== undefined || !online) return;
-    let cancelled = false;
-    fetchLocationConsent().then(
-      (value) => {
-        if (!cancelled) setConsent(value);
-      },
-      () => {},
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [consent, online]);
-
-  // Sem saber se já aceitou (ex.: falha de rede), mostra o aviso: aceitar de novo não tem efeito colateral.
-  const handleWantStart = useCallback(() => go(consent === true ? 'start' : 'consent'), [consent, go]);
-
-  const handleAcceptConsent = useCallback(async () => {
-    await acceptLocationTerms();
-    setConsent(true);
-    // Pede a permissão do GPS agora, logo depois da explicação, e não no meio da saída.
-    void getPosition();
-    go('start', { replace: true });
-  }, [go]);
-
   const handleStart = useCallback(
     async (vehicle: FleetVehicle, destination: string, tripType: TripType) => {
-      // GPS da saída em paralelo: não atrasa nem impede o início da viagem.
-      const departure = consent === true ? getPosition() : null;
       try {
         const trip = await startTrip(vehicle, destination, tripType);
         setOpenTrip(trip);
         openTripRef.current = trip;
         go('trip', { replace: true });
-        void departure?.then((result) => {
-          if ('error' in result) return;
-          enqueuePoint(trip.id, 'saida', result);
-          void flushPoints(trip.id);
-        });
       } catch (err) {
         const error = toAppError(err);
         if (error.code === 'DRIVER_HAS_OPEN_TRIP') {
@@ -169,20 +123,14 @@ export function DriverApp({ driver }: { driver: Driver }) {
         void reloadFleet();
       }
     },
-    [consent, go, loadOpenTrip, reloadFleet],
+    [go, loadOpenTrip, reloadFleet],
   );
 
   const handleSigned = useCallback(
     async (signature: Blob) => {
       const trip = openTripRef.current;
       if (!trip || kmEnd === null || refuel === undefined) return;
-      // Pontos ainda na fila vão antes de fechar: depois disso o banco não aceita mais. Falha aqui não impede finalizar.
-      await Promise.race([returnPointRef.current, new Promise((resolve) => window.setTimeout(resolve, RETURN_POINT_WAIT_MS))]);
-      await flushPoints(trip.id);
       const result = await finishTrip(driver.id, trip, kmEnd, refuel, signature);
-      returnPointRef.current = null;
-      clearPoints(trip.id);
-      requestRouteCalc(trip.id);
       setFinished(result);
       setOpenTrip(null);
       openTripRef.current = null;
@@ -200,13 +148,11 @@ export function DriverApp({ driver }: { driver: Driver }) {
   if ((screen === 'fuel' || screen === 'sign') && kmEnd === null) effective = openTrip ? 'km' : 'home';
   else if (screen === 'sign' && refuel === undefined) effective = openTrip ? 'fuel' : 'home';
   if (screen === 'done' && !finished) effective = 'home';
-  if ((screen === 'home' || screen === 'consent' || screen === 'start') && openTrip) effective = 'trip';
+  if ((screen === 'home' || screen === 'start') && openTrip) effective = 'trip';
 
   let content: ReactNode;
   if (openTrip === undefined && !tripError) {
     content = <SplashScreen />;
-  } else if (effective === 'consent') {
-    content = <LocationConsentScreen onBack={back} onAccept={handleAcceptConsent} />;
   } else if (effective === 'start') {
     content = (
       <StartTripScreen fleet={fleet.data ?? []} online={online} onBack={back} onConfirm={handleStart} onConflict={() => void reloadFleet()} />
@@ -216,11 +162,9 @@ export function DriverApp({ driver }: { driver: Driver }) {
       <ActiveTripScreen
         trip={openTrip}
         online={online}
-        tracking={consent === true}
         onFinish={() => {
           setKmEnd(null);
           setRefuel(undefined);
-          if (consent === true) returnPointRef.current = recordPoint(openTrip.id, 'retorno');
           go('km');
         }}
       />
@@ -264,7 +208,7 @@ export function DriverApp({ driver }: { driver: Driver }) {
   } else if (effective === 'done' && finished) {
     content = <DoneScreen summary={finished} onHome={() => go('home', { replace: true })} />;
   } else {
-    content = <HomeScreen driver={driver} fleet={fleet} online={online} onStart={handleWantStart} onSignOut={() => void signOut()} />;
+    content = <HomeScreen driver={driver} fleet={fleet} online={online} onStart={() => go('start')} onSignOut={() => void signOut()} />;
   }
 
   const key = openTrip === undefined && !tripError ? 'loading' : effective;

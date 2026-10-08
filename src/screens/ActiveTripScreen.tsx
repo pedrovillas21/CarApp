@@ -1,43 +1,17 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { m } from 'motion/react';
 import { Button } from '../components/Button';
-import { IconAlert, IconCar, IconFlag, IconFuel, IconGauge, IconPin } from '../components/Icons';
+import { IconCar, IconFlag, IconFuel, IconGauge, IconPin } from '../components/Icons';
 import { LogoTexto } from '../components/Logo';
 import { Plate } from '../components/Plate';
 import { useNow } from '../hooks/useNow';
-import { useTripTracking } from '../hooks/useTripTracking';
 import type { OpenTrip } from '../lib/api';
 import { formatDuration, formatKm, formatTime } from '../lib/format';
 
-type StopFeedback = { ok: true; at: string } | { ok: false; denied: boolean };
-
-/** tracking: o condutor leu o aviso de localização; sem isso o GPS não é lido. */
-export function ActiveTripScreen({ trip, online, tracking, onFinish }: {
-  trip: OpenTrip;
-  online: boolean;
-  tracking: boolean;
-  onFinish: () => void;
-}) {
+export function ActiveTripScreen({ trip, online, onFinish }: { trip: OpenTrip; online: boolean; onFinish: () => void }) {
   // O tempo sai de started_at do banco: fechar o app ou trocar de aparelho não zera o cronômetro.
   const now = useNow(1000);
   const elapsed = formatDuration(now - new Date(trip.startedAt).getTime());
-  const { gps, registerStop } = useTripTracking(trip.id, tracking);
-  const [stopping, setStopping] = useState(false);
-  const [stop, setStop] = useState<StopFeedback | null>(null);
-
-  const handleStop = async () => {
-    setStopping(true);
-    const result = await registerStop();
-    setStop('error' in result ? { ok: false, denied: result.error === 'denied' } : { ok: true, at: result.recordedAt });
-    setStopping(false);
-  };
-
-  let hint: string;
-  if (stop?.ok) hint = `Parada registrada às ${formatTime(stop.at)}. Use de novo a cada destino.`;
-  else if (stop) hint = stop.denied ? 'GPS desligado: a parada não foi registrada.' : 'Não foi possível ler o GPS agora. Tente de novo.';
-  else if (!online) hint = 'Sem conexão agora. O cronômetro continua contando.';
-  else if (trip.tripType === 'abastecimento') hint = 'Ao devolver o carro, informe o KM do painel, o valor abastecido e assine.';
-  else hint = 'Ao devolver o carro, informe o KM do painel e assine.';
 
   return (
     <main className="flex min-h-dvh flex-col bg-azul text-white">
@@ -92,22 +66,15 @@ export function ActiveTripScreen({ trip, online, tracking, onFinish }: {
       </m.section>
 
       <footer className="flex flex-col gap-3 px-5 pt-5 pb-[max(28px,env(safe-area-inset-bottom))]">
-        {tracking && gps === 'negado' && (
-          <span className="flex items-center justify-center gap-2 text-[13px] text-laranja">
-            <IconAlert size={16} />
-            GPS desligado: a rota não será registrada.
-          </span>
-        )}
-        {tracking && (
-          <Button variant="onDark" onClick={handleStop} loading={stopping} loadingLabel="Registrando…" icon={<IconPin />}>
-            Cheguei ao destino
-          </Button>
-        )}
         <Button variant="accent" onClick={onFinish} icon={<IconFlag />} className="h-[58px]">
           Finalizar viagem
         </Button>
-        <span role="status" className="text-center text-[13px] text-white/80">
-          {hint}
+        <span className="text-center text-[13px] text-white/80">
+          {!online
+            ? 'Sem conexão agora. O cronômetro continua contando.'
+            : trip.tripType === 'abastecimento'
+              ? 'Ao devolver o carro, informe o KM do painel, o valor abastecido e assine.'
+              : 'Ao devolver o carro, informe o KM do painel e assine.'}
         </span>
       </footer>
     </main>

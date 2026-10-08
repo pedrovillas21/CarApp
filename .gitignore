@@ -17,3 +17,6 @@ video/
 scripts/video/tmp/
 scripts/video/venv/
 scripts/video/quadros/
+
+# Arquivos temporários do Supabase CLI
+supabase/.temp/
